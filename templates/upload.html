@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Soundboard Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .sounds-list {
+            margin-top: 20px;
+        }
+
+        .sound-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: background 0.2s;
+        }
+
+        .sound-item:hover {
+            background: #e9ecef;
+        }
+
+        .sound-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .sound-emoji {
+            font-size: 2em;
+        }
+
+        .sound-details h3 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .sound-details p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #667eea;
+            color: white;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge.inactive {
+            background: #ccc;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .emoji-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Discord Soundboard Manager</h1>
+        
+        <div class="card">
+            <h2>Upload New Sound</h2>
+            <div id="message" class="message"></div>
+            
+            <form id="uploadForm" class="upload-section">
+                <div class="form-group">
+                    <label for="title">Sound Title *</label>
+                    <input type="text" id="title" name="title" required placeholder="e.g., Epic Intro">
+                </div>
+                
+                <div class="form-group">
+                    <label for="emoji">Emoji</label>
+                    <input type="text" id="emoji" name="emoji" maxlength="2" placeholder="🔊" value="🔊">
+                    <p class="emoji-hint">Tip: Copy an emoji from your keyboard or emoji picker</p>
+                </div>
+                
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="showInButton" name="showInButton" checked>
+                        <label for="showInButton" style="margin-bottom: 0;">Show in /soundboard buttons</label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="file">Audio File * (mp3, wav, ogg, flac - max 16MB)</label>
+                    <input type="file" id="file" name="file" accept=".mp3,.wav,.ogg,.flac" required>
+                </div>
+                
+                <button type="submit" class="btn">Upload Sound</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h2>Uploaded Sounds</h2>
+            <div id="soundsList" class="sounds-list">
+                <p class="loading">Loading sounds...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/sounds';
+
+        // Show message
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // Load sounds
+        async function loadSounds() {
+            try {
+                const response = await fetch(API_BASE);
+                const data = await response.json();
+                
+                const soundsList = document.getElementById('soundsList');
+                
+                if (data.sounds.length === 0) {
+                    soundsList.innerHTML = '<p class="loading">No sounds uploaded yet. Upload your first sound above!</p>';
+                    return;
+                }
+                
+                soundsList.innerHTML = data.sounds.map(sound => `
+                    <div class="sound-item">
+                        <div class="sound-info">
+                            <div class="sound-emoji">${sound.emoji}</div>
+                            <div class="sound-details">
+                                <h3>${sound.title}</h3>
+                                <p>${sound.filename}</p>
+                            </div>
+                            <span class="badge ${sound.showInButton ? '' : 'inactive'}">
+                                ${sound.showInButton ? 'In Soundboard' : 'Hidden'}
+                            </span>
+                        </div>
+                        <button class="btn btn-danger" onclick="deleteSound('${sound.id}')">Delete</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading sounds:', error);
+                document.getElementById('soundsList').innerHTML = '<p class="loading">Error loading sounds</p>';
+            }
+        }
+
+        // Upload sound
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('file', document.getElementById('file').files[0]);
+            formData.append('title', document.getElementById('title').value);
+            formData.append('emoji', document.getElementById('emoji').value);
+            formData.append('showInButton', document.getElementById('showInButton').checked);
+            
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Sound uploaded successfully!', 'success');
+                    document.getElementById('uploadForm').reset();
+                    document.getElementById('emoji').value = '🔊';
+                    document.getElementById('showInButton').checked = true;
+                    loadSounds();
+                } else {
+                    showMessage(result.error || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                console.error('Error uploading:', error);
+                showMessage('Upload failed. Please try again.', 'error');
+            }
+        });
+
+        // Delete sound
+        async function deleteSound(id) {
+            if (!confirm('Are you sure you want to delete this sound?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Sound deleted successfully!', 'success');
+                    loadSounds();
+                } else {
+                    showMessage(result.error || 'Delete failed', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting:', error);
+                showMessage('Delete failed. Please try again.', 'error');
+            }
+        }
+
+        // Load sounds on page load
+        loadSounds();
+    </script>
+</body>
+</html>

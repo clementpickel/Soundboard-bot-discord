@@ -1,0 +1,25 @@
+{
+  "sounds": [
+    {
+      "id": "test",
+      "title": "Test Sound",
+      "emoji": "🔊",
+      "filename": "test.mp3",
+      "showInButton": true
+    },
+    {
+      "id": "missing",
+      "title": "Missing",
+      "emoji": "❔",
+      "filename": "missing.mp3",
+      "showInButton": true
+    },
+    {
+      "id": "QUAND_SKYYART_EXPLIQUE_LA_PENETRATION_MAGIQUE_SUR_LOL",
+      "title": "Skyart",
+      "emoji": "🪄",
+      "filename": "QUAND_SKYYART_EXPLIQUE_LA_PENETRATION_MAGIQUE_SUR_LOL.mp3",
+      "showInButton": true
+    }
+  ]
+}

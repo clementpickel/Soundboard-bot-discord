@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  discord-bot:
+    build: .
+    container_name: soundboard-discord-bot
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persist audio files and database
+      - ./assets:/app/assets
+      - ./sounds.json:/app/sounds.json
+      # Mount .env for token (excluded from image)
+      - ./.env:/app/.env:ro
+    environment:
+      - TZ=Europe/Paris
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
