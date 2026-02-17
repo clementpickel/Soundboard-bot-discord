@@ -4,6 +4,8 @@ from discord.ui import View, Button
 import os
 import json
 import threading
+import asyncio
+import audioop
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
@@ -126,6 +128,96 @@ def run_flask():
     """Run Flask app in a separate thread"""
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
+# Audio Mixer for simultaneous playback
+class AudioMixer(discord.AudioSource):
+    """Mix multiple audio sources together for simultaneous playback"""
+    
+    def __init__(self):
+        self.sources = []
+        self.lock = threading.Lock()
+    
+    def add_source(self, source):
+        """Add an audio source to the mixer"""
+        with self.lock:
+            self.sources.append(source)
+    
+    def remove_source(self, source):
+        """Remove an audio source from the mixer"""
+        with self.lock:
+            if source in self.sources:
+                self.sources.remove(source)
+    
+    def read(self):
+        """Read and mix audio from all sources"""
+        with self.lock:
+            if not self.sources:
+                return b''
+            
+            # Read from all sources
+            frames = []
+            sources_to_remove = []
+            
+            for source in self.sources:
+                try:
+                    data = source.read()
+                    if data:
+                        frames.append(data)
+                    else:
+                        # Source is exhausted
+                        sources_to_remove.append(source)
+                        if hasattr(source, 'cleanup'):
+                            source.cleanup()
+                except Exception as e:
+                    print(f"Error reading from source: {e}")
+                    sources_to_remove.append(source)
+            
+            # Remove exhausted sources
+            for source in sources_to_remove:
+                self.sources.remove(source)
+            
+            if not frames:
+                return b''
+            
+            # Mix all frames together
+            if len(frames) == 1:
+                return frames[0]
+            
+            # Average mixing
+            mixed = frames[0]
+            for frame in frames[1:]:
+                # Ensure both frames are the same length
+                min_len = min(len(mixed), len(frame))
+                mixed = audioop.add(mixed[:min_len], frame[:min_len], 2)
+            
+            # Reduce volume to prevent clipping (divide by number of sources)
+            if len(frames) > 1:
+                mixed = audioop.mul(mixed, 2, 1.0 / len(frames))
+            
+            return mixed
+    
+    def cleanup(self):
+        """Clean up all sources"""
+        with self.lock:
+            for source in self.sources:
+                if hasattr(source, 'cleanup'):
+                    try:
+                        source.cleanup()
+                    except:
+                        pass
+            self.sources.clear()
+    
+    def is_opus(self):
+        return False
+
+# Store mixers per guild
+guild_mixers = {}
+
+def get_or_create_mixer(guild_id):
+    """Get or create a mixer for a guild"""
+    if guild_id not in guild_mixers:
+        guild_mixers[guild_id] = AudioMixer()
+    return guild_mixers[guild_id]
+
 # Discord bot setup
 class MyBot(discord.Client):
     def __init__(self):
@@ -182,18 +274,28 @@ class DynamicSoundboardView(View):
             elif voice_client.channel != lobby_channel:
                 await voice_client.move_to(lobby_channel)
             
+            # Wait for connection to be ready
+            if not voice_client.is_connected():
+                await interaction.response.send_message(f"⏳ Connecting to voice... Please try again in a moment.", ephemeral=True)
+                return
+            
             # Play the sound
             audio_path = f"assets/{sound['filename']}"
             if not os.path.exists(audio_path):
                 await interaction.response.send_message(f"❌ Sound file not found: {sound['filename']}", ephemeral=True)
                 return
             
+            # Get or create mixer for this guild
+            mixer = get_or_create_mixer(interaction.guild.id)
+            
+            # Add audio source to mixer
             audio_source = discord.FFmpegPCMAudio(audio_path)
+            mixer.add_source(audio_source)
             
-            if voice_client.is_playing():
-                voice_client.stop()
+            # Start playing mixer if not already playing
+            if not voice_client.is_playing():
+                voice_client.play(mixer, after=lambda e: print(f'Mixer stopped: {e}' if e else 'Mixer stopped'))
             
-            voice_client.play(audio_source, after=lambda e: print(f'Finished playing {sound["title"]}: {e}' if e else f'Played {sound["title"]} successfully'))
             await interaction.response.send_message(f"🎵 Playing {sound['emoji']} {sound['title']}!", ephemeral=True)
         
         return callback
@@ -203,7 +305,7 @@ async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     print(f'Bot is in {len(bot.guilds)} guilds')
     print('Commands synced!')
-    print('Web interface available at: http://localhost:5000')
+    print('Web interface available at: https://soundboard.clementpickel.fr/')
 
 @bot.tree.command(name='join', description='Join the Lobby voice channel and play test.mp3')
 async def join_lobby(interaction: discord.Interaction):
@@ -231,13 +333,16 @@ async def join_lobby(interaction: discord.Interaction):
         await voice_client.move_to(lobby_channel)
         await interaction.response.send_message(f"Moved to {lobby_channel.name}!")
     
-    # Play the sound
+    # Get or create mixer for this guild
+    mixer = get_or_create_mixer(interaction.guild.id)
+    
+    # Add audio source to mixer
     audio_source = discord.FFmpegPCMAudio('assets/test.mp3')
+    mixer.add_source(audio_source)
     
-    if voice_client.is_playing():
-        voice_client.stop()
-    
-    voice_client.play(audio_source, after=lambda e: print(f'Finished playing: {e}' if e else 'Sound played successfully'))
+    # Start playing mixer if not already playing
+    if not voice_client.is_playing():
+        voice_client.play(mixer, after=lambda e: print(f'Mixer stopped: {e}' if e else 'Mixer stopped'))
 
 @bot.tree.command(name='leave', description='Disconnect from the voice channel')
 async def leave_voice(interaction: discord.Interaction):
@@ -245,10 +350,35 @@ async def leave_voice(interaction: discord.Interaction):
     voice_client = discord.utils.get(bot.voice_clients, guild=interaction.guild)
     
     if voice_client:
+        # Clean up the mixer
+        if interaction.guild.id in guild_mixers:
+            guild_mixers[interaction.guild.id].cleanup()
+            del guild_mixers[interaction.guild.id]
+        
         await voice_client.disconnect()
         await interaction.response.send_message("Disconnected from voice channel!")
     else:
         await interaction.response.send_message("I'm not in a voice channel!")
+
+@bot.tree.command(name='stop', description='Stop all currently playing sounds')
+async def stop_sounds(interaction: discord.Interaction):
+    """Stop all sounds that are currently playing"""
+    voice_client = discord.utils.get(bot.voice_clients, guild=interaction.guild)
+    
+    if voice_client is None:
+        await interaction.response.send_message("I'm not in a voice channel!", ephemeral=True)
+        return
+    
+    # Clean up the mixer and create a new one
+    if interaction.guild.id in guild_mixers:
+        guild_mixers[interaction.guild.id].cleanup()
+        del guild_mixers[interaction.guild.id]
+    
+    # Stop the voice client
+    if voice_client.is_playing():
+        voice_client.stop()
+    
+    await interaction.response.send_message("🛑 Stopped all sounds!", ephemeral=True)
 
 @bot.tree.command(name='play', description='Play test.mp3')
 async def play_sound(interaction: discord.Interaction):
@@ -259,12 +389,17 @@ async def play_sound(interaction: discord.Interaction):
         await interaction.response.send_message("I'm not in a voice channel! Use /join first")
         return
     
+    # Get or create mixer for this guild
+    mixer = get_or_create_mixer(interaction.guild.id)
+    
+    # Add audio source to mixer
     audio_source = discord.FFmpegPCMAudio('assets/test.mp3')
+    mixer.add_source(audio_source)
     
-    if voice_client.is_playing():
-        voice_client.stop()
+    # Start playing mixer if not already playing
+    if not voice_client.is_playing():
+        voice_client.play(mixer, after=lambda e: print(f'Mixer stopped: {e}' if e else 'Mixer stopped'))
     
-    voice_client.play(audio_source, after=lambda e: print(f'Finished playing: {e}' if e else 'Sound played successfully'))
     await interaction.response.send_message("Playing test.mp3!")
 
 @bot.tree.command(name='help', description='Show available commands')
@@ -287,13 +422,18 @@ async def help_command(interaction: discord.Interaction):
         inline=False
     )
     embed.add_field(
+        name="/stop",
+        value="Stop all currently playing sounds",
+        inline=False
+    )
+    embed.add_field(
         name="/leave",
         value="Disconnect from the voice channel",
         inline=False
     )
     embed.add_field(
         name="/soundboard",
-        value="Display an interactive soundboard with buttons (up to 25 sounds)",
+        value="Display an interactive soundboard with buttons (up to 25 sounds) - sounds can play simultaneously!",
         inline=False
     )
     embed.add_field(
@@ -310,11 +450,11 @@ async def help_command(interaction: discord.Interaction):
     
     embed.add_field(
         name="🌐 Web Interface",
-        value="Upload and manage sounds at: http://localhost:5000",
+        value="Upload and manage sounds at: https://soundboard.clementpickel.fr/",
         inline=False
     )
     
-    embed.set_footer(text="Click the buttons to play sounds!")
+    embed.set_footer(text="Click the buttons to play sounds! Multiple sounds can play at once!")
     
     await interaction.response.send_message(embed=embed)
 
@@ -380,7 +520,7 @@ async def soundboard_command(interaction: discord.Interaction):
     
     if not button_sounds:
         await interaction.response.send_message(
-            "❌ No sounds available in the soundboard. Upload sounds at http://localhost:5000",
+            "❌ No sounds available in the soundboard. Upload sounds at https://soundboard.clementpickel.fr/",
             ephemeral=True
         )
         return
@@ -402,7 +542,7 @@ async def soundboard_command(interaction: discord.Interaction):
         inline=False
     )
     
-    embed.set_footer(text="Upload more sounds at http://localhost:5000")
+    embed.set_footer(text="Upload more sounds at https://soundboard.clementpickel.fr/")
     
     view = DynamicSoundboardView(button_sounds)
     await interaction.response.send_message(embed=embed, view=view)
@@ -414,7 +554,7 @@ if __name__ == '__main__':
     flask_thread.start()
     
     print("Starting Discord bot...")
-    print("Web interface will be available at http://localhost:5000")
+    print("Web interface will be available at https://soundboard.clementpickel.fr/")
     
     # Run the Discord bot
     bot.run(TOKEN)

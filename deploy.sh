@@ -51,7 +51,7 @@ scp ${SSH_OPTS} "${TARFILE}" "${USER}@${SERVER}:~/"
 echo "📤 Copying .env file to ${USER}@${SERVER}:~/"
 scp ${SSH_OPTS} ".env" "${USER}@${SERVER}:~/.env.soundboard"
 
-echo "📤 Copying sounds.json to ${USER}@${SERVER}:~/"
+echo "📤 Copying sounds.json to ${USER}@${SERVER}:~/ (will only use if remote doesn't exist)"
 scp ${SSH_OPTS} "sounds.json" "${USER}@${SERVER}:~/sounds.json.soundboard"
 
 # === 4. Connect via SSH and run container on remote
@@ -75,9 +75,16 @@ echo "-> Using data directory: \${REMOTE_DATA_DIR}"
 echo "-> Creating remote data directory at \${REMOTE_DATA_DIR}..."
 mkdir -p "\${REMOTE_DATA_DIR}/assets"
 
-echo "-> Moving .env and sounds.json to data directory..."
+echo "-> Moving .env to data directory..."
 mv ~/.env.soundboard "\${REMOTE_DATA_DIR}/.env"
-mv ~/sounds.json.soundboard "\${REMOTE_DATA_DIR}/sounds.json"
+
+if [ ! -f "\${REMOTE_DATA_DIR}/sounds.json" ]; then
+  echo "-> No existing sounds.json found, using uploaded version..."
+  mv ~/sounds.json.soundboard "\${REMOTE_DATA_DIR}/sounds.json"
+else
+  echo "-> Using existing sounds.json (preserving uploaded sounds)..."
+  rm -f ~/sounds.json.soundboard
+fi
 
 echo "-> Loading image from \${TARFILE_REMOTE}..."
 \${REMOTE_SUDO} docker load -i "\${TARFILE_REMOTE}"
