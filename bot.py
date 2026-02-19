@@ -1,11 +1,13 @@
 import discord
 from discord import app_commands
 from discord.ui import View, Button
+from discord.ext import tasks
 import os
 import json
 import threading
 import asyncio
 import audioop
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
@@ -212,11 +214,18 @@ class AudioMixer(discord.AudioSource):
 # Store mixers per guild
 guild_mixers = {}
 
+# Store last activity time per guild
+guild_last_activity = {}
+
 def get_or_create_mixer(guild_id):
     """Get or create a mixer for a guild"""
     if guild_id not in guild_mixers:
         guild_mixers[guild_id] = AudioMixer()
     return guild_mixers[guild_id]
+
+def update_activity(guild_id):
+    """Update the last activity time for a guild"""
+    guild_last_activity[guild_id] = datetime.now()
 
 # Discord bot setup
 class MyBot(discord.Client):
@@ -235,6 +244,46 @@ class MyBot(discord.Client):
         await self.tree.sync()
 
 bot = MyBot()
+
+@tasks.loop(minutes=1)
+async def check_inactive_guilds():
+    """Check for inactive guilds and disconnect if idle for 10 minutes"""
+    now = datetime.now()
+    guilds_to_disconnect = []
+    
+    for voice_client in bot.voice_clients:
+        guild_id = voice_client.guild.id
+        
+        # Check if guild has activity tracking
+        if guild_id in guild_last_activity:
+            last_activity = guild_last_activity[guild_id]
+            idle_time = now - last_activity
+            
+            # If idle for more than 10 minutes, mark for disconnection
+            if idle_time > timedelta(minutes=10):
+                guilds_to_disconnect.append((voice_client, guild_id))
+    
+    # Disconnect from inactive guilds
+    for voice_client, guild_id in guilds_to_disconnect:
+        try:
+            # Clean up the mixer
+            if guild_id in guild_mixers:
+                guild_mixers[guild_id].cleanup()
+                del guild_mixers[guild_id]
+            
+            # Remove activity tracking
+            if guild_id in guild_last_activity:
+                del guild_last_activity[guild_id]
+            
+            await voice_client.disconnect()
+            print(f"Auto-disconnected from guild {guild_id} due to 10 minutes of inactivity")
+        except Exception as e:
+            print(f"Error disconnecting from guild {guild_id}: {e}")
+
+@check_inactive_guilds.before_loop
+async def before_check_inactive_guilds():
+    """Wait for the bot to be ready before starting the loop"""
+    await bot.wait_until_ready()
 
 # Dynamic Soundboard button view
 class DynamicSoundboardView(View):
@@ -285,6 +334,9 @@ class DynamicSoundboardView(View):
                 await interaction.response.send_message(f"❌ Sound file not found: {sound['filename']}", ephemeral=True)
                 return
             
+            # Update activity tracking
+            update_activity(interaction.guild.id)
+            
             # Get or create mixer for this guild
             mixer = get_or_create_mixer(interaction.guild.id)
             
@@ -306,6 +358,11 @@ async def on_ready():
     print(f'Bot is in {len(bot.guilds)} guilds')
     print('Commands synced!')
     print('Web interface available at: https://soundboard.clementpickel.fr/')
+    
+    # Start the inactive guild checker
+    if not check_inactive_guilds.is_running():
+        check_inactive_guilds.start()
+        print('Auto-leave after 10 minutes of inactivity: ENABLED')
 
 @bot.tree.command(name='join', description='Join the Lobby voice channel and play test.mp3')
 async def join_lobby(interaction: discord.Interaction):
@@ -332,6 +389,9 @@ async def join_lobby(interaction: discord.Interaction):
     else:
         await voice_client.move_to(lobby_channel)
         await interaction.response.send_message(f"Moved to {lobby_channel.name}!")
+    
+    # Update activity tracking
+    update_activity(interaction.guild.id)
     
     # Get or create mixer for this guild
     mixer = get_or_create_mixer(interaction.guild.id)
@@ -369,6 +429,9 @@ async def stop_sounds(interaction: discord.Interaction):
         await interaction.response.send_message("I'm not in a voice channel!", ephemeral=True)
         return
     
+    # Update activity tracking
+    update_activity(interaction.guild.id)
+    
     # Clean up the mixer and create a new one
     if interaction.guild.id in guild_mixers:
         guild_mixers[interaction.guild.id].cleanup()
@@ -388,6 +451,9 @@ async def play_sound(interaction: discord.Interaction):
     if voice_client is None:
         await interaction.response.send_message("I'm not in a voice channel! Use /join first")
         return
+    
+    # Update activity tracking
+    update_activity(interaction.guild.id)
     
     # Get or create mixer for this guild
     mixer = get_or_create_mixer(interaction.guild.id)
