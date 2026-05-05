@@ -573,41 +573,57 @@ async def update_command(interaction: discord.Interaction):
         print(f"Error in update command: {e}")
 
 @bot.tree.command(name='soundboard', description='Display interactive soundboard')
-async def soundboard_command(interaction: discord.Interaction):
+@app_commands.describe(page='Page number (1, 2, 3...)')
+async def soundboard_command(interaction: discord.Interaction, page: int = 1):
     """Display soundboard with buttons"""
-    
+
     # Load sounds from JSON
     data = load_sounds()
-    
-    # Filter sounds with showInButton=true and limit to 25
-    button_sounds = [s for s in data['sounds'] if s.get('showInButton', False)][:25]
-    
+
+    # Filter sounds with showInButton=true
+    all_button_sounds = [s for s in data['sounds'] if s.get('showInButton', False)]
+    total_sounds = len(all_button_sounds)
+    total_pages = max(1, (total_sounds + 24) // 25)
+
+    if page < 1:
+        page = 1
+    if page > total_pages:
+        page = total_pages
+
+    start_idx = (page - 1) * 25
+    end_idx = start_idx + 25
+    button_sounds = all_button_sounds[start_idx:end_idx]
+
     if not button_sounds:
         await interaction.response.send_message(
-            "❌ No sounds available in the soundboard. Upload sounds at https://soundboard.clementpickel.fr/",
+            f"❌ No sounds on page {page}. Upload sounds at https://soundboard.clementpickel.fr/",
             ephemeral=True
         )
         return
-    
+
+    page_info = f"Page {page} of {total_pages}" if total_pages > 1 else f"{total_sounds} sounds"
+
     embed = discord.Embed(
         title="🎵 Soundboard",
-        description=f"Click a button to play a sound!\nThe bot will join the configured voice channel automatically.\n\n**{len(button_sounds)} sounds available**",
+        description=f"Click a button to play a sound!\nThe bot will join the configured voice channel automatically.\n\n**{page_info}**",
         color=discord.Color.green()
     )
-    
-    # List sounds
+
     sound_list = "\n".join([f"{s['emoji']} **{s['title']}**" for s in button_sounds[:10]])
     if len(button_sounds) > 10:
         sound_list += f"\n... and {len(button_sounds) - 10} more!"
-    
+
     embed.add_field(
         name="📁 Available Sounds",
         value=sound_list,
         inline=False
     )
-    
-    embed.set_footer(text="Upload more sounds at https://soundboard.clementpickel.fr/")
-    
+
+    if total_pages > 1:
+        embed.set_footer(text=f"Use /soundboard {{1-{total_pages}}} to see more pages | Upload at https://soundboard.clementpickel.fr/")
+    else:
+        embed.set_footer(text="Upload more sounds at https://soundboard.clementpickel.fr/")
+
     view = DynamicSoundboardView(button_sounds)
     await interaction.response.send_message(embed=embed, view=view)
 

@@ -4,7 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Discord Soundboard Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-dark: #0d0d0d;
+            --bg-card: #1a1a1a;
+            --bg-input: #141414;
+            --text-primary: #e8e8e8;
+            --text-secondary: #888888;
+            --accent: #ff6b00;
+            --accent-hover: #ff8533;
+            --danger: #ff3333;
+            --border: #2a2a2a;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,91 +29,139 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--bg-dark);
             min-height: 100vh;
-            padding: 20px;
+            padding: 40px 20px;
+            color: var(--text-primary);
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 0;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 900px;
             margin: 0 auto;
+            position: relative;
+            z-index: 1;
         }
 
         h1 {
-            color: white;
-            text-align: center;
-            margin-bottom: 30px;
+            font-family: 'Archivo Black', sans-serif;
             font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            text-align: center;
+            margin-bottom: 50px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            text-shadow: 4px 4px 0px var(--accent);
+        }
+
+        h2 {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.2em;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 25px;
+            color: var(--text-primary);
+            border-left: 4px solid var(--accent);
+            padding-left: 15px;
         }
 
         .card {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 35px;
             margin-bottom: 30px;
-        }
-
-        .upload-section {
-            margin-bottom: 30px;
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.5);
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
 
         label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             font-weight: 600;
-            color: #333;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
         }
 
         input[type="text"],
         input[type="file"] {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
+            padding: 14px 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 14px;
+            color: var(--text-primary);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input[type="text"]::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
         }
 
         input[type="text"]:focus,
         input[type="file"]:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(255, 107, 0, 0.2);
         }
 
         .checkbox-group {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            text-transform: none;
+            letter-spacing: 1px;
+            font-size: 14px;
+            color: var(--text-primary);
         }
 
         .btn {
-            padding: 12px 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            padding: 14px 40px;
+            background: var(--accent);
+            color: #000;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: background 0.2s, transform 0.1s;
         }
 
         .btn:hover {
+            background: var(--accent-hover);
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
         .btn:active {
@@ -104,133 +169,163 @@
         }
 
         .btn-danger {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            padding: 8px 16px;
-            font-size: 14px;
+            background: var(--danger);
+            padding: 10px 18px;
+            font-size: 12px;
+        }
+
+        .btn-danger:hover {
+            background: #ff5555;
         }
 
         .sounds-list {
-            margin-top: 20px;
+            margin-top: 25px;
         }
 
         .sound-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            transition: background 0.2s;
+            padding: 18px 20px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
         }
 
         .sound-item:hover {
-            background: #e9ecef;
+            border-color: var(--text-secondary);
         }
 
         .sound-info {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 20px;
             flex: 1;
         }
 
         .sound-emoji {
             font-size: 2em;
+            line-height: 1;
         }
 
         .sound-details h3 {
-            color: #333;
-            margin-bottom: 5px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            font-weight: 600;
         }
 
         .sound-details p {
-            color: #666;
-            font-size: 14px;
+            color: var(--text-secondary);
+            font-size: 12px;
         }
 
         .badge {
             display: inline-block;
-            padding: 4px 12px;
-            background: #667eea;
-            color: white;
-            border-radius: 20px;
-            font-size: 12px;
+            padding: 5px 14px;
+            background: var(--border);
+            color: var(--text-secondary);
+            font-size: 10px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
-        .badge.inactive {
-            background: #ccc;
+        .badge.active {
+            background: var(--accent);
+            color: #000;
         }
 
         .message {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 16px 20px;
+            margin-bottom: 25px;
             display: none;
+            font-size: 13px;
+            font-weight: 500;
+            border-left: 4px solid;
         }
 
         .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--success);
+            border-color: var(--success);
         }
 
         .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border-color: var(--error);
         }
 
         .emoji-hint {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            letter-spacing: 1px;
         }
 
         .loading {
             text-align: center;
-            color: #666;
-            padding: 20px;
+            color: var(--text-secondary);
+            padding: 40px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        @media (max-width: 600px) {
+            .sound-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .sound-info {
+                flex-wrap: wrap;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎵 Discord Soundboard Manager</h1>
-        
+        <h1>Soundboard Manager</h1>
+
         <div class="card">
             <h2>Upload New Sound</h2>
             <div id="message" class="message"></div>
-            
+
             <form id="uploadForm" class="upload-section">
                 <div class="form-group">
                     <label for="title">Sound Title *</label>
-                    <input type="text" id="title" name="title" required placeholder="e.g., Epic Intro">
+                    <input type="text" id="title" name="title" required placeholder="Epic Intro">
                 </div>
-                
+
                 <div class="form-group">
                     <label for="emoji">Emoji</label>
                     <input type="text" id="emoji" name="emoji" maxlength="2" placeholder="🔊" value="🔊">
-                    <p class="emoji-hint">Tip: Copy an emoji from your keyboard or emoji picker</p>
+                    <p class="emoji-hint">Copy an emoji from your keyboard or emoji picker</p>
                 </div>
-                
+
                 <div class="form-group">
                     <div class="checkbox-group">
                         <input type="checkbox" id="showInButton" name="showInButton" checked>
-                        <label for="showInButton" style="margin-bottom: 0;">Show in /soundboard buttons</label>
+                        <label for="showInButton">Show in /soundboard buttons</label>
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="file">Audio File * (mp3, wav, ogg, flac - max 16MB)</label>
                     <input type="file" id="file" name="file" accept=".mp3,.wav,.ogg,.flac" required>
                 </div>
-                
+
                 <button type="submit" class="btn">Upload Sound</button>
             </form>
         </div>
-        
+
         <div class="card">
             <h2>Uploaded Sounds</h2>
             <div id="soundsList" class="sounds-list">
@@ -242,31 +337,29 @@
     <script>
         const API_BASE = '/api/sounds';
 
-        // Show message
         function showMessage(text, type) {
             const messageEl = document.getElementById('message');
             messageEl.textContent = text;
             messageEl.className = `message ${type}`;
             messageEl.style.display = 'block';
-            
+
             setTimeout(() => {
                 messageEl.style.display = 'none';
             }, 5000);
         }
 
-        // Load sounds
         async function loadSounds() {
             try {
                 const response = await fetch(API_BASE);
                 const data = await response.json();
-                
+
                 const soundsList = document.getElementById('soundsList');
-                
+
                 if (data.sounds.length === 0) {
-                    soundsList.innerHTML = '<p class="loading">No sounds uploaded yet. Upload your first sound above!</p>';
+                    soundsList.innerHTML = '<p class="loading">No sounds uploaded yet</p>';
                     return;
                 }
-                
+
                 soundsList.innerHTML = data.sounds.map(sound => `
                     <div class="sound-item">
                         <div class="sound-info">
@@ -275,8 +368,8 @@
                                 <h3>${sound.title}</h3>
                                 <p>${sound.filename}</p>
                             </div>
-                            <span class="badge ${sound.showInButton ? '' : 'inactive'}">
-                                ${sound.showInButton ? 'In Soundboard' : 'Hidden'}
+                            <span class="badge ${sound.showInButton ? 'active' : ''}">
+                                ${sound.showInButton ? 'Soundboard' : 'Hidden'}
                             </span>
                         </div>
                         <button class="btn btn-danger" onclick="deleteSound('${sound.id}')">Delete</button>
@@ -288,24 +381,23 @@
             }
         }
 
-        // Upload sound
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const formData = new FormData();
             formData.append('file', document.getElementById('file').files[0]);
             formData.append('title', document.getElementById('title').value);
             formData.append('emoji', document.getElementById('emoji').value);
             formData.append('showInButton', document.getElementById('showInButton').checked);
-            
+
             try {
                 const response = await fetch(API_BASE, {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (response.ok) {
                     showMessage('Sound uploaded successfully!', 'success');
                     document.getElementById('uploadForm').reset();
@@ -321,21 +413,20 @@
             }
         });
 
-        // Delete sound
         async function deleteSound(id) {
-            if (!confirm('Are you sure you want to delete this sound?')) {
+            if (!confirm('Delete this sound?')) {
                 return;
             }
-            
+
             try {
                 const response = await fetch(`${API_BASE}/${id}`, {
                     method: 'DELETE'
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (response.ok) {
-                    showMessage('Sound deleted successfully!', 'success');
+                    showMessage('Sound deleted', 'success');
                     loadSounds();
                 } else {
                     showMessage(result.error || 'Delete failed', 'error');
@@ -346,7 +437,6 @@
             }
         }
 
-        // Load sounds on page load
         loadSounds();
     </script>
 </body>
