@@ -217,6 +217,9 @@ guild_mixers = {}
 # Store last activity time per guild
 guild_last_activity = {}
 
+# Store channel name per guild
+guild_channel_names = {}
+
 def get_or_create_mixer(guild_id):
     """Get or create a mixer for a guild"""
     if guild_id not in guild_mixers:
@@ -303,15 +306,11 @@ class DynamicSoundboardView(View):
     def create_callback(self, sound):
         """Create a callback function for each button"""
         async def callback(interaction: discord.Interaction):
-            # Find the "Lobby" voice channel
-            lobby_channel = None
-            for channel in interaction.guild.voice_channels:
-                if channel.name.lower() == 'lobby':
-                    lobby_channel = channel
-                    break
+            channel_name = guild_channel_names.get(interaction.guild.id, "Lobby")
+            lobby_channel = discord.utils.get(interaction.guild.voice_channels, name=channel_name)
             
             if lobby_channel is None:
-                await interaction.response.send_message("Could not find a voice channel named 'Lobby'", ephemeral=True)
+                await interaction.response.send_message(f"Could not find a voice channel named '{channel_name}'", ephemeral=True)
                 return
             
             # Get the voice client for this guild
@@ -364,19 +363,18 @@ async def on_ready():
         check_inactive_guilds.start()
         print('Auto-leave after 10 minutes of inactivity: ENABLED')
 
-@bot.tree.command(name='join', description='Join the Lobby voice channel and play test.mp3')
-async def join_lobby(interaction: discord.Interaction):
-    """Join the Lobby voice channel and play test.mp3"""
+@bot.tree.command(name='join', description='Join a voice channel and play test.mp3')
+@app_commands.describe(channel_name='Voice channel name (default: Lobby)')
+async def join_lobby(interaction: discord.Interaction, channel_name: str = "Lobby"):
+    """Join a voice channel and play test.mp3"""
     
-    # Find the "Lobby" voice channel
-    lobby_channel = None
-    for channel in interaction.guild.voice_channels:
-        if channel.name.lower() == 'lobby':
-            lobby_channel = channel
-            break
+    guild_id = interaction.guild.id
+    guild_channel_names[guild_id] = channel_name
+    
+    lobby_channel = discord.utils.get(interaction.guild.voice_channels, name=channel_name)
     
     if lobby_channel is None:
-        await interaction.response.send_message("Could not find a voice channel named 'Lobby'")
+        await interaction.response.send_message(f"Could not find a voice channel named '{channel_name}'")
         return
     
     # Get the voice client for this guild
@@ -479,7 +477,7 @@ async def help_command(interaction: discord.Interaction):
     
     embed.add_field(
         name="/join",
-        value="Join the Lobby voice channel and play test.mp3",
+        value="Join a voice channel and play test.mp3 (default: Lobby)",
         inline=False
     )
     embed.add_field(
@@ -593,7 +591,7 @@ async def soundboard_command(interaction: discord.Interaction):
     
     embed = discord.Embed(
         title="🎵 Soundboard",
-        description=f"Click a button to play a sound!\nThe bot will join the **Lobby** voice channel automatically.\n\n**{len(button_sounds)} sounds available**",
+        description=f"Click a button to play a sound!\nThe bot will join the configured voice channel automatically.\n\n**{len(button_sounds)} sounds available**",
         color=discord.Color.green()
     )
     

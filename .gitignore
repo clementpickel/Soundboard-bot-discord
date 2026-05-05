@@ -212,3 +212,5 @@ docker-compose.override.yml
 
 # Deployment temporary files
 soundboard-bot_*.tar
+.kilo/
+CLAUDE_FRONTEND.md
